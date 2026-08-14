@@ -119,7 +119,7 @@ h1 .title-line2{
 #albums{
   margin-top:30px;
   display:grid;
-  grid-template-columns:repeat(2,1fr);
+  grid-template-columns:1fr;   /* 每一本都是整列的大卡 */
   gap:18px;
 }
 .album{
@@ -144,32 +144,8 @@ h1 .title-line2{
   transform:translateY(-3px);
   box-shadow:0 2px 0 var(--paper-line), 0 16px 28px -16px rgba(43,38,32,.45);
 }
-/* 最新的一本相簿佔滿整列，標題壓在照片上，讓版面有主次之分 */
-.album.hero{
-  grid-column:1 / -1;
-}
-.album.hero .cover{
-  aspect-ratio:16/9;
-}
-.album.hero .meta{
-  position:absolute;
-  left:0;right:0;bottom:0;
-  padding:34px 20px 16px;
-  background:linear-gradient(to top, rgba(21,63,56,.88) 30%, rgba(21,63,56,0));
-  color:#FAF5EA;
-}
-.album.hero .aname{
-  font-size:20px;
-  color:#FAF5EA;
-}
-.album.hero .adate{color:rgba(250,245,234,.82);}
-/* 大卡底部是深色漸層，深色的張數標籤在那裡看不見，移到右上角 */
-.album.hero .count{
-  top:12px;bottom:auto;right:12px;
-  background:rgba(21,63,56,.62);
-  backdrop-filter:blur(4px);
-}
-.album.hero .latest{
+/* 只有最新的那一本會掛這個標籤 */
+.album .latest{
   position:absolute;
   left:12px;top:12px;
   background:var(--apricot);
@@ -181,19 +157,9 @@ h1 .title-line2{
   border-radius:999px;
 }
 
-/* 拼貼封面：左邊一大張、右邊上下兩小張，一眼看得出這是一整本相簿 */
-.cover.collage{
-  display:grid;
-  grid-template-columns:2fr 1fr;
-  grid-template-rows:1fr 1fr;
-  gap:3px;
-}
-.cover.collage img{border-radius:0;}
-.cover.collage img:first-child{grid-row:1 / 3;}
-
 .album .cover{
   position:relative;
-  aspect-ratio:4/3;
+  aspect-ratio:16/9;
   background:#EFE9DC;
   overflow:hidden;
 }
@@ -204,28 +170,24 @@ h1 .title-line2{
   transition:transform .4s ease;
 }
 .album:hover .cover img{transform:scale(1.04);}
-.album .count{
+/* 標題與日期壓在照片上，靠漸層壓暗底部確保讀得到 */
+.album .meta{
   position:absolute;
-  right:10px;bottom:10px;
-  background:rgba(21,63,56,.86);
-  color:#fff;
-  font-size:11px;
-  font-weight:700;
-  letter-spacing:.05em;
-  padding:4px 10px;
-  border-radius:999px;
+  left:0;right:0;bottom:0;
+  padding:34px 20px 16px;
+  background:linear-gradient(to top, rgba(21,63,56,.88) 30%, rgba(21,63,56,0));
 }
-.album .meta{padding:14px 16px 16px;}
 .album .aname{
-  font-size:15px;
+  font-size:20px;
   font-weight:700;
   line-height:1.5;
   word-break:break-word;
+  color:#FAF5EA;
 }
 .album .adate{
   margin-top:6px;
   font-size:12px;
-  color:var(--ink-soft);
+  color:rgba(250,245,234,.82);
 }
 
 /* ---------- 單一相簿 ---------- */
@@ -364,8 +326,9 @@ footer{
 
 @media (max-width:480px){
   #albums{gap:14px;}
-  .album .meta{padding:12px 13px 14px;}
-  .album .aname{font-size:14px;}
+  /* 疊字版面：上方留白是給漸層淡出用的，不能收太緊 */
+  .album .meta{padding:26px 14px 12px;}
+  .album .aname{font-size:16px;}
   #photos{grid-template-columns:repeat(2,1fr);gap:8px;}
   .lb-prev{left:6px;}
   .lb-next{right:6px;}
@@ -602,17 +565,10 @@ function showSkeleton(){
   el.albums.innerHTML = [0,1,2,3].map(() => '<div class="skeleton"></div>').join("");
 }
 
-// 大卡只放一張，用寬一點的尺寸
+// 每一本相簿都是整列的大卡，封面只放第一張，用寬一點的尺寸
 function heroCover(a){
   const cover = a.photos[0];
   return cover ? imgTag(cover.id, 1200, a.name) : '';
-}
-
-// 拼貼封面固定放 3 張（不足就有幾張放幾張），版位由 CSS grid 決定
-function collageCover(a){
-  return a.photos.slice(0, 3)
-    .map((p, i) => imgTag(p.id, i === 0 ? 600 : 300, a.name))
-    .join("");
 }
 
 function renderAlbumList(){
@@ -626,16 +582,14 @@ function renderAlbumList(){
   }
   hideState();
 
-  // 第一本（最新的）做成整列的大卡，其餘用拼貼封面，版面才有主次
+  // 每一本都用同樣的大卡樣式，只有最新的那一本多一個「最新活動」標籤
   el.albums.innerHTML = albums.map((a, idx) => {
-    const hero = idx === 0;
     return (
-      '<button type="button" class="album' + (hero ? ' hero' : '') + '"' +
+      '<button type="button" class="album"' +
         ' data-id="' + escapeHtml(a.id) + '" style="animation-delay:' + (idx * 0.04) + 's">' +
-        '<div class="cover' + (hero ? '' : ' collage') + '">' +
-          (hero ? heroCover(a) : collageCover(a)) +
-          (hero ? '<span class="latest">最新活動</span>' : '') +
-          '<span class="count">' + a.photos.length + ' 張</span>' +
+        '<div class="cover">' +
+          heroCover(a) +
+          (idx === 0 ? '<span class="latest">最新活動</span>' : '') +
         '</div>' +
         '<div class="meta">' +
           '<div class="aname">' + escapeHtml(a.name) + '</div>' +
