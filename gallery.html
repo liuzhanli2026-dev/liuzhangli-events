@@ -342,10 +342,109 @@ footer{
 
 <script>
 // ============================================================
-// 請把下面這行換成你的 Apps Script 網址（部署後取得的 /exec 結尾網址）
-// 部署方式見同資料夾的 gallery-apps-script.gs
+// 相簿資料有兩種來源，二選一即可：
+//
+// (A) 內建清單（現在用的就是這個）— 下面 ALBUMS_EMBEDDED 已經填好你雲端硬碟裡的相簿。
+//     不需要任何設定，上傳就能用。缺點：之後在雲端硬碟「新增活動資料夾」或
+//     「加照片」，網頁不會自動更新，要重新產生一次這份清單。
+//
+// (B) Apps Script（自動更新）— 之後若有辦法部署，把 /exec 網址填進下面的
+//     ALBUM_API，網頁就會改成即時讀取雲端硬碟，新增資料夾馬上出現。
+//     部署方式見 gallery-apps-script.gs。若讀取失敗會自動退回內建清單。
 // ============================================================
-const ALBUM_API = "請貼上你的_APPS_SCRIPT_網址_結尾是_exec";
+const ALBUM_API = ""; // 例：https://script.google.com/macros/s/AKfycb.../exec
+
+// 內建清單（2026-08-15 產生，共 4 本相簿 59 張照片）。
+// 沒有填 ALBUM_API、或 Apps Script 讀取失敗時，畫面就用這一份。
+const ALBUMS_EMBEDDED = [
+  {
+    id: "10odhmdr11wZ6O343efN_P1pMsn5XB4e_",
+    name: "洞洞瑜伽 x 頌缽",
+    date: "2026-06-26",
+    photos: [
+      { id: "1Q78yEbCQtv8teo_S25RbnoZBZG-BjFfq", name: "00" },
+      { id: "1nNAMZ3-XTX2YvJxv5KtpAcDbUT8VQHLR", name: "01" },
+      { id: "1lJ2HCyUkSs09i3vktXJBY0f4WQeC-BuX", name: "02" },
+      { id: "1Q-KqtVIAIicpDEz9p0pS9cwBM46F4BM3", name: "03" },
+      { id: "1pHNnbgUAE661GfvQi070LTAkwhrE_MnC", name: "04" },
+      { id: "1Dexn6VVuNSRIZxq0aybnw7cEisi37VCd", name: "05" },
+      { id: "1yLT9z4674BkgtIirLZ66yhAH5B0al_zk", name: "06" },
+      { id: "1aIcliMn7wY1x0AI0SKzbs0nTNDiGZSYl", name: "07" },
+      { id: "1Wq2qRAzH72OFmIbGGtV4yHY1H1XR5jFo", name: "08" },
+      { id: "1EWYEcbekvZZd-lEXFPZyZhwWsF9Znqvf", name: "09" },
+    ]
+  },
+  {
+    id: "1MzSqvmGkHVYdJEPiw-se6seolmFliQMZ",
+    name: "Amber動態健身團課",
+    date: "2026-05-15",
+    photos: [
+      { id: "11Uyw-7Yb2Y4YHwNV2vPNt-jC6WDWlLtB", name: "00" },
+      { id: "1Is_ZIutMXE_bwfnd0U6e43_35gUCzPSZ", name: "01" },
+      { id: "124raV4NV311wqoiDDnM5N18Mqh6MyMbB", name: "02" },
+      { id: "1r1ISVeuhs9awIcIKd8wFIhIKgmu2fdnc", name: "03" },
+      { id: "18QG2WFP_5fYAgr9SRnLN9EjLmNI8uT84", name: "04" },
+      { id: "1pUWtEDFKzljgKGgTI5D6nMPzp-a3XeoZ", name: "05" },
+      { id: "1Igg1rJYMsndWl4A_feYsbyeBM7Ng1OQs", name: "06" },
+      { id: "1xZgdFMqa5mPoK5Uhwa5IuBln1sDQmdPp", name: "07" },
+      { id: "1dr2SDY8uN8NENd8vmuE-m-oI180Wmbqu", name: "08" },
+      { id: "1_U1mYyk_r519kjDtNJWjCei0hTuyCEMl", name: "09" },
+      { id: "1cLCZKkWXvPpKmTM5a0itma4R2UCHwPLE", name: "10" },
+      { id: "1eKUjddeqqRYXtRKZ_JEK5mS2Rphd2OoF", name: "11" },
+      { id: "1sHecLIury2Kc7gYB2ga0zhK_XQXliQzY", name: "12" },
+      { id: "1WvPhv7p1iC_CgxoStgvO5qf3pEPC4NFM", name: "13" },
+      { id: "1dMM6OMc5mcrINmHjaMCGLXdUOq_zJNjE", name: "14" },
+      { id: "18uXgfTr39ruUfCnmPnSommXJlrt55nhM", name: "15" },
+      { id: "1zwHAYlsCJvKlMxvItAJCR8DMygJwLI81", name: "16" },
+      { id: "18sR42BosFzVuqlI2QEsjka7Fqg_Fp63p", name: "17" },
+      { id: "1xTeirJhl-X_natHkW3UdeDIe0VYrZpSa", name: "18" },
+      { id: "1KOC-nGMoL6zR_JoOigoF0ekAP9ubK_uj", name: "19" },
+      { id: "15-66AV41ou0CVTxGFWZQP8jRIkU5vmCF", name: "20" },
+      { id: "1FX4crQ8f1IKxfv15LfOrDFqvGX-o3ep9", name: "21" },
+      { id: "1E3WE3Ksk_NKiSWcVmMYdqYeCdzpidZxg", name: "22" },
+      { id: "19Ms-EPf_RSRQ2Cz_y4VgYQLrGtR289b9", name: "23" },
+      { id: "10YloXgL7UzwchHgADbtCr8s1CJKNFf3k", name: "24" },
+      { id: "1xK-twwMMum-zQ7lIna__hSmKIhZap0Ct", name: "25" },
+      { id: "1WON94I0cFdb-OmHlWuwukS_gfOuQZ2en", name: "26" },
+    ]
+  },
+  {
+    id: "1TljcfYocDYOJeo2raygk4YkDnz81ef9t",
+    name: "活力動起來-夜跑",
+    date: "2026-04-15",
+    photos: [
+      { id: "1MYwS4UD_tMIHlDGix_wt87m7UXOy3l9T", name: "00" },
+      { id: "1vYnFBB6ld8TkEuTAAZy0b4whRc_fiuTA", name: "01" },
+      { id: "1RJVP0B1NyBVh-_Sq2RW9b72uNS4mTYER", name: "02" },
+      { id: "1Hp26XIn3pS25xRJtgBlZv-0nh5FysxD5", name: "03" },
+      { id: "1l7XtsKI5sWpgG9dBgtMNmScuj0sH-d7u", name: "04" },
+      { id: "1BatEhwtuTr6ANd-TGy-ao4XUIjiuXIk_", name: "05" },
+      { id: "1k0zFn8-W-FF2Vd4WK03Reki6TU0SiMnr", name: "06" },
+      { id: "1gfL_GlRcAB6RyImDblt-TlAwrI8uU8FZ", name: "07" },
+      { id: "1R_GcwjpaudftNB7Zf625GwK1_maony1x", name: "08" },
+      { id: "1zUvU2BH82hsrcaQaXbUIepV2Yg7ocoVh", name: "09" },
+    ]
+  },
+  {
+    id: "1-seBUaIleJu8-F4hfC-jx1GlWYggwTO-",
+    name: "入厝趴",
+    date: "2026-03-14",
+    photos: [
+      { id: "1UB5O2eijjjp2-pn2M7WpwVtlWsjz_3Py", name: "00" },
+      { id: "14MnqG-8UCPA9C3TDtHLhw9itc9IpqWqN", name: "01" },
+      { id: "1uLP5NOTNF6y3MGnnLuehC-W2Gnvv2BTu", name: "02" },
+      { id: "1liW0WDfsjM4eI0KG8oSzo2RPT7F2Nsmv", name: "03" },
+      { id: "1JwC5g0r2VznN51HcoxqXfEUvoqciv5AW", name: "04" },
+      { id: "1K1OiAtOL17lM7Y2wvsT4SSLtBg2yojpL", name: "05" },
+      { id: "1ykTekgr5VmHue7GQRTrEk98otWIYEsIe", name: "06" },
+      { id: "1LPiMWlCRoI1pWulN2roRQ435isK2yMmE", name: "07" },
+      { id: "19An6YCbzqsAOCKQqEuuWsl9jafzHcrtU", name: "08" },
+      { id: "17R_NAdaLjiPrbq4FScGp5VqOQy_rSuCq", name: "09" },
+      { id: "1S20wKVqOknvIoobcayjtwTxaLYCrFftO", name: "10" },
+      { id: "1mF0kw8ogVyKo84vBKOkuqoVRxcVneFAr", name: "11" },
+    ]
+  },
+];
 
 const CACHE_KEY = "gallery-cache-v1";
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 快取超過一天就不再拿來當第一眼畫面
@@ -593,7 +692,16 @@ async function load(){
     showState('<div class="spinner"></div>正在讀取活動相簿…');
   }
 
-  // 第二步：背景抓最新資料
+  // 第二步：背景抓最新資料。沒有填 ALBUM_API 就直接用內建清單，
+  // 不要去 fetch("")——那會抓回本頁的 HTML，解析 JSON 時必定失敗。
+  if(!ALBUM_API){
+    albums = ALBUMS_EMBEDDED.filter(a => a.photos && a.photos.length);
+    el.refreshNote.textContent = "";
+    route();
+    el.footer.textContent = "照片來源：Google 雲端硬碟";
+    return;
+  }
+
   try{
     const res = await fetch(ALBUM_API, { cache: "no-store" });
     if(!res.ok) throw new Error("HTTP " + res.status);
@@ -608,8 +716,15 @@ async function load(){
     el.footer.textContent = "照片來源：Google 雲端硬碟・上次更新讀取：" + now.toLocaleString("zh-TW");
     cacheStore.set(CACHE_KEY, JSON.stringify({ albums: albums, savedAt: now.toISOString() }));
   } catch(err){
+    const fallback = ALBUMS_EMBEDDED.filter(a => a.photos && a.photos.length);
     if(hadCache){
       el.refreshNote.textContent = "目前無法連上最新資料，暫時顯示上次讀取的內容。";
+    } else if(fallback.length){
+      // 連不上 Apps Script 時退回內建清單，至少不要開天窗
+      albums = fallback;
+      el.refreshNote.textContent = "目前無法連上最新資料，顯示的是內建的相簿清單。";
+      route();
+      el.footer.textContent = "照片來源：Google 雲端硬碟";
     } else {
       el.albums.innerHTML = "";
       showState("相簿讀取失敗，請重新整理頁面再試一次。<br><span style='font-size:12px'>(" + escapeHtml(err.message || err) + ")</span>");
