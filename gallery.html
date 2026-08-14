@@ -124,6 +124,9 @@ h1 .title-line2{
 }
 .album{
   display:block;
+  /* 大卡的標題是絕對定位壓在圖上，這裡一定要是定位參考點。
+     （原本只是碰巧靠 rise 動畫留下的 transform 撐住，動畫一改就會跑掉） */
+  position:relative;
   text-align:left;
   background:var(--card);
   border:0;
@@ -141,6 +144,53 @@ h1 .title-line2{
   transform:translateY(-3px);
   box-shadow:0 2px 0 var(--paper-line), 0 16px 28px -16px rgba(43,38,32,.45);
 }
+/* 最新的一本相簿佔滿整列，標題壓在照片上，讓版面有主次之分 */
+.album.hero{
+  grid-column:1 / -1;
+}
+.album.hero .cover{
+  aspect-ratio:16/9;
+}
+.album.hero .meta{
+  position:absolute;
+  left:0;right:0;bottom:0;
+  padding:34px 20px 16px;
+  background:linear-gradient(to top, rgba(21,63,56,.88) 30%, rgba(21,63,56,0));
+  color:#FAF5EA;
+}
+.album.hero .aname{
+  font-size:20px;
+  color:#FAF5EA;
+}
+.album.hero .adate{color:rgba(250,245,234,.82);}
+/* 大卡底部是深色漸層，深色的張數標籤在那裡看不見，移到右上角 */
+.album.hero .count{
+  top:12px;bottom:auto;right:12px;
+  background:rgba(21,63,56,.62);
+  backdrop-filter:blur(4px);
+}
+.album.hero .latest{
+  position:absolute;
+  left:12px;top:12px;
+  background:var(--apricot);
+  color:#3A2A12;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.08em;
+  padding:4px 10px;
+  border-radius:999px;
+}
+
+/* 拼貼封面：左邊一大張、右邊上下兩小張，一眼看得出這是一整本相簿 */
+.cover.collage{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  grid-template-rows:1fr 1fr;
+  gap:3px;
+}
+.cover.collage img{border-radius:0;}
+.cover.collage img:first-child{grid-row:1 / 3;}
+
 .album .cover{
   position:relative;
   aspect-ratio:4/3;
@@ -230,7 +280,15 @@ h1 .title-line2{
   max-height:82vh;
   border-radius:8px;
   box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
+  touch-action:pan-y;
+  -webkit-user-select:none;user-select:none;
+  -webkit-user-drag:none;
 }
+/* 剛打開時先放大顯示已經快取的小圖，等大圖載好再換掉。
+   小圖放大會糊，加一點模糊反而看起來像刻意的漸進載入。 */
+.lightbox img.soft{filter:blur(7px);}
+/* 手指滑動時圖片跟著移動；放開後才加回動畫，免得跟著手指有延遲 */
+.lightbox img.settle{transition:transform .22s ease, opacity .22s ease;}
 .lb-btn{
   position:absolute;
   background:rgba(250,245,234,.14);
@@ -544,6 +602,19 @@ function showSkeleton(){
   el.albums.innerHTML = [0,1,2,3].map(() => '<div class="skeleton"></div>').join("");
 }
 
+// 大卡只放一張，用寬一點的尺寸
+function heroCover(a){
+  const cover = a.photos[0];
+  return cover ? imgTag(cover.id, 1200, a.name) : '';
+}
+
+// 拼貼封面固定放 3 張（不足就有幾張放幾張），版位由 CSS grid 決定
+function collageCover(a){
+  return a.photos.slice(0, 3)
+    .map((p, i) => imgTag(p.id, i === 0 ? 600 : 300, a.name))
+    .join("");
+}
+
 function renderAlbumList(){
   el.photos.innerHTML = "";
   el.albumHead.innerHTML = "";
@@ -555,12 +626,15 @@ function renderAlbumList(){
   }
   hideState();
 
+  // 第一本（最新的）做成整列的大卡，其餘用拼貼封面，版面才有主次
   el.albums.innerHTML = albums.map((a, idx) => {
-    const cover = a.photos[0];
+    const hero = idx === 0;
     return (
-      '<button type="button" class="album" data-id="' + escapeHtml(a.id) + '" style="animation-delay:' + (idx * 0.04) + 's">' +
-        '<div class="cover">' +
-          (cover ? imgTag(cover.id, 600, a.name) : '') +
+      '<button type="button" class="album' + (hero ? ' hero' : '') + '"' +
+        ' data-id="' + escapeHtml(a.id) + '" style="animation-delay:' + (idx * 0.04) + 's">' +
+        '<div class="cover' + (hero ? '' : ' collage') + '">' +
+          (hero ? heroCover(a) : collageCover(a)) +
+          (hero ? '<span class="latest">最新活動</span>' : '') +
           '<span class="count">' + a.photos.length + ' 張</span>' +
         '</div>' +
         '<div class="meta">' +
@@ -598,33 +672,96 @@ function renderAlbum(album){
 
 // ---------- 放大檢視 ----------
 
+const LB_FULL_W = 1600;   // 放大檢視用的大圖寬度
+const LB_THUMB_W = 400;   // 格子縮圖的寬度，跟 renderAlbum 一致才會命中快取
+
+let lbLoadToken = 0;      // 快速連按時，只認最後一次的載入結果
+let lbPreload = [];       // 保留參考，不然預載的 Image 會被回收
+let lbScrollY = 0;        // 記住背景捲動位置，關閉時要還原
+
 function openLightbox(idx){
   if(!lbPhotos.length) return;
   lbIndex = idx;
   updateLightbox();
   el.lightbox.classList.add("open");
-  document.body.style.overflow = "hidden";
+  lockScroll();
 }
 function closeLightbox(){
+  const wasOpen = el.lightbox.classList.contains("open");
   el.lightbox.classList.remove("open");
+  lbLoadToken++;
   // 用 removeAttribute 而不是 src=""，否則某些瀏覽器會再觸發一次 onerror
   el.lbImg.removeAttribute("data-fid");
   el.lbImg.removeAttribute("src");
-  document.body.style.overflow = "";
+  el.lbImg.classList.remove("soft");
+  el.lbImg.style.transform = "";
+  if(wasOpen) unlockScroll();
 }
+
+// iOS Safari 不理會 body{overflow:hidden}，背景照樣可以捲，
+// 所以改成把 body 固定住並記下原本的捲動位置。
+function lockScroll(){
+  lbScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.position = "fixed";
+  document.body.style.top = -lbScrollY + "px";
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.overflow = "hidden";
+}
+function unlockScroll(){
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.overflow = "";
+  window.scrollTo(0, lbScrollY);
+}
+
 function stepLightbox(delta){
   if(!lbPhotos.length) return;
   lbIndex = (lbIndex + delta + lbPhotos.length) % lbPhotos.length;
   updateLightbox();
 }
+
 function updateLightbox(){
   const p = lbPhotos[lbIndex];
+  const token = ++lbLoadToken;
+
+  el.lbImg.style.transform = "";
   el.lbImg.setAttribute("data-fid", p.id);
-  el.lbImg.setAttribute("data-w", "1600");
+  el.lbImg.setAttribute("data-w", String(LB_FULL_W));
   el.lbImg.setAttribute("data-try", "0");
-  el.lbImg.src = driveImg(p.id, 1600);
   el.lbImg.alt = "照片 " + (lbIndex + 1);
   el.lbCount.textContent = (lbIndex + 1) + " / " + lbPhotos.length;
+
+  // 先秀已經在格子裡載過的小圖（瀏覽器快取，等於立刻出現），
+  // 大圖在背景載，載好才換掉，中間不會出現空白。
+  el.lbImg.classList.add("soft");
+  el.lbImg.src = driveImg(p.id, LB_THUMB_W);
+
+  const full = new Image();
+  full.referrerPolicy = "no-referrer";
+  full.onload = () => {
+    if(token !== lbLoadToken) return; // 期間又換了照片就不要蓋掉
+    el.lbImg.src = full.src;
+    el.lbImg.classList.remove("soft");
+  };
+  full.src = driveImg(p.id, LB_FULL_W);
+
+  preloadNeighbours();
+}
+
+// 預載前後各一張，翻頁時才不會閃一下
+function preloadNeighbours(){
+  if(lbPhotos.length < 2) return;
+  const next = lbPhotos[(lbIndex + 1) % lbPhotos.length];
+  const prev = lbPhotos[(lbIndex - 1 + lbPhotos.length) % lbPhotos.length];
+  lbPreload = [next, prev].map(p => {
+    const im = new Image();
+    im.referrerPolicy = "no-referrer";
+    im.src = driveImg(p.id, LB_FULL_W);
+    return im;
+  });
 }
 
 document.getElementById("lbClose").addEventListener("click", closeLightbox);
@@ -636,6 +773,46 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape") closeLightbox();
   else if(e.key === "ArrowLeft") stepLightbox(-1);
   else if(e.key === "ArrowRight") stepLightbox(1);
+});
+
+// ---------- 手機滑動翻頁 ----------
+// 手指左右滑動換照片；上下滑動不攔截，讓使用者還能正常關掉或捲動。
+const SWIPE_MIN = 50;     // 超過這個距離才算翻頁
+let swipeX = 0, swipeY = 0, swiping = false, swipeLocked = false;
+
+el.lightbox.addEventListener("touchstart", e => {
+  if(e.touches.length !== 1) return;
+  swipeX = e.touches[0].clientX;
+  swipeY = e.touches[0].clientY;
+  swiping = true;
+  swipeLocked = false;
+  el.lbImg.classList.remove("settle");
+}, { passive: true });
+
+el.lightbox.addEventListener("touchmove", e => {
+  if(!swiping || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - swipeX;
+  const dy = e.touches[0].clientY - swipeY;
+
+  // 第一次判斷方向：橫向才接手，縱向就整個放掉
+  if(!swipeLocked){
+    if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if(Math.abs(dy) > Math.abs(dx)){ swiping = false; return; }
+    swipeLocked = true;
+  }
+  if(e.cancelable) e.preventDefault();
+  el.lbImg.style.transform = "translateX(" + dx + "px)";
+}, { passive: false });
+
+el.lightbox.addEventListener("touchend", e => {
+  if(!swiping) return;
+  swiping = false;
+  const dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : swipeX) - swipeX;
+  el.lbImg.classList.add("settle");
+  el.lbImg.style.transform = "";
+  if(swipeLocked && Math.abs(dx) > SWIPE_MIN){
+    stepLightbox(dx < 0 ? 1 : -1);   // 往左滑 = 看下一張
+  }
 });
 
 // 事件委派：相簿卡片與照片都是動態產生的
