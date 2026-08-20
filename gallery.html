@@ -363,21 +363,43 @@ footer{
 
 <script>
 // ============================================================
-// 相簿資料有兩種來源，二選一即可：
+// 相簿資料來源
 //
-// (A) 內建清單（現在用的就是這個）— 下面 ALBUMS_EMBEDDED 已經填好你雲端硬碟裡的相簿。
-//     不需要任何設定，上傳就能用。缺點：之後在雲端硬碟「新增活動資料夾」或
-//     「加照片」，網頁不會自動更新，要重新產生一次這份清單。
+// 主要來源＝ALBUM_API（Apps Script 網頁應用程式的 /exec 網址）。
+// 有填的話，網頁每次打開都會直接掃描雲端硬碟：在主資料夾裡新增一個
+// 「20260815_活動名稱」的資料夾、照片命名 00、01、02… 丟進去，
+// 網頁就會自己多出一本相簿，不用改任何程式碼。
 //
-// (B) Apps Script（自動更新）— 之後若有辦法部署，把 /exec 網址填進下面的
-//     ALBUM_API，網頁就會改成即時讀取雲端硬碟，新增資料夾馬上出現。
-//     部署方式見 gallery-apps-script.gs。若讀取失敗會自動退回內建清單。
+// 備援＝下面的 ALBUMS_EMBEDDED（固定清單）。
+// ALBUM_API 沒填、連不上、或回傳空清單時才會用到，確保畫面不會開天窗。
+//
+// ⚠️ 要確認網頁現在到底用哪一個，看頁尾：走 ALBUM_API 才會出現「上次更新讀取：時間」。
+//    部署方式見 gallery-apps-script.gs。
 // ============================================================
-const ALBUM_API = ""; // 例：https://script.google.com/macros/s/AKfycb.../exec
+const ALBUM_API = "https://script.google.com/macros/s/AKfycby2tOq1kkaXxImp7_Sk4rsBjOdcnpzk6Us8kJeNsQE41h8UdZUK5nANyh7oftY0xEvmrA/exec";
 
-// 內建清單（2026-08-15 產生，共 4 本相簿 59 張照片）。
-// 沒有填 ALBUM_API、或 Apps Script 讀取失敗時，畫面就用這一份。
+// 備援清單（2026-08-20 產生，共 5 本相簿 71 張照片）。
+// 只有在 ALBUM_API 沒填、連不上、或回傳空清單時才會用到。
 const ALBUMS_EMBEDDED = [
+  {
+    id: "1RLr3-6C-sW0VnksSCMkbasoxSi2Axa2L",
+    name: "體態調校實驗室-臀肌召喚術",
+    date: "2026-08-15",
+    photos: [
+      { id: "1Ul6biMYT8DaO_sU-KBoBgYVS8R5LeMya", name: "00" },
+      { id: "17GuBjLuw1YuJH2onOQxtIdcapub6z0Ok", name: "01" },
+      { id: "1X5AJDZeyklfXF0fdJ7VU3CsA8za8npvR", name: "02" },
+      { id: "1-WA78IIJq6ydrJ2IK4__hYfKPuOCNWRt", name: "03" },
+      { id: "1CEvHpfmcZqW7Z_rE4Kj98DGL3kiaw_vH", name: "04" },
+      { id: "1wqzohX9-5ORpeoPQwleJr-l1njwRBiDJ", name: "05" },
+      { id: "1SBdkXK9rc5lk_x_zOh8nD3nArRQPm7dR", name: "06" },
+      { id: "1UVpnDK0ahRdpg-997uiGNMoNU168nwSz", name: "07" },
+      { id: "1NIm_UkVvd0sD0AGUvpZseE3sDqAJROt6", name: "08" },
+      { id: "1LKcI1bwnc8ek-QiM5ilWnVJaQwWi-37s", name: "09" },
+      { id: "1yjB5VyTu5eET2UgXXFqdsPnA0SLdJlzP", name: "10" },
+      { id: "1odaAQrqCNCW12f92NKfEJxJFDyqBu7r_", name: "11" },
+    ]
+  },
   {
     id: "10odhmdr11wZ6O343efN_P1pMsn5XB4e_",
     name: "洞洞瑜伽 x 頌缽",
@@ -839,7 +861,12 @@ async function load(){
     const data = await res.json();
     if(data.error) throw new Error(data.error);
 
-    albums = (data.albums || []).filter(a => a.photos && a.photos.length);
+    const live = (data.albums || []).filter(a => a.photos && a.photos.length);
+    // 空的回應不能拿來蓋掉畫面：route() 遇到 0 本相簿會直接 return，
+    // 訪客就會永遠卡在「正在讀取活動相簿…」的轉圈畫面。當成讀取失敗處理，走下面的退路。
+    if(!live.length) throw new Error("雲端硬碟沒有回傳任何相簿");
+
+    albums = live;
     el.refreshNote.textContent = "";
     route();
 
